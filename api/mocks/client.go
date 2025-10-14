@@ -10,8 +10,6 @@ import (
 
 	client "github.com/ava-labs/coreth/plugin/evm/client"
 
-	health "github.com/ava-labs/avalanchego/api/health"
-
 	indexer "github.com/ava-labs/avalanchego/indexer"
 
 	info "github.com/ava-labs/avalanchego/api/info"
@@ -27,19 +25,19 @@ type Client struct {
 }
 
 // AdminAPI provides a mock function with no fields
-func (_m *Client) AdminAPI() admin.Client {
+func (_m *Client) AdminAPI() *admin.Client {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for AdminAPI")
 	}
 
-	var r0 admin.Client
-	if rf, ok := ret.Get(0).(func() admin.Client); ok {
+	var r0 *admin.Client
+	if rf, ok := ret.Get(0).(func() *admin.Client); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(admin.Client)
+			r0 = ret.Get(0).(*admin.Client)
 		}
 	}
 
@@ -87,19 +85,19 @@ func (_m *Client) CChainEthAPI() api.EthClient {
 }
 
 // CChainIndexAPI provides a mock function with no fields
-func (_m *Client) CChainIndexAPI() indexer.Client {
+func (_m *Client) CChainIndexAPI() *indexer.Client {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for CChainIndexAPI")
 	}
 
-	var r0 indexer.Client
-	if rf, ok := ret.Get(0).(func() indexer.Client); ok {
+	var r0 *indexer.Client
+	if rf, ok := ret.Get(0).(func() *indexer.Client); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(indexer.Client)
+			r0 = ret.Get(0).(*indexer.Client)
 		}
 	}
 
@@ -107,19 +105,19 @@ func (_m *Client) CChainIndexAPI() indexer.Client {
 }
 
 // HealthAPI provides a mock function with no fields
-func (_m *Client) HealthAPI() health.Client {
+func (_m *Client) HealthAPI() api.HealthClient {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for HealthAPI")
 	}
 
-	var r0 health.Client
-	if rf, ok := ret.Get(0).(func() health.Client); ok {
+	var r0 api.HealthClient
+	if rf, ok := ret.Get(0).(func() api.HealthClient); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(health.Client)
+			r0 = ret.Get(0).(api.HealthClient)
 		}
 	}
 
@@ -127,19 +125,19 @@ func (_m *Client) HealthAPI() health.Client {
 }
 
 // InfoAPI provides a mock function with no fields
-func (_m *Client) InfoAPI() info.Client {
+func (_m *Client) InfoAPI() *info.Client {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for InfoAPI")
 	}
 
-	var r0 info.Client
-	if rf, ok := ret.Get(0).(func() info.Client); ok {
+	var r0 *info.Client
+	if rf, ok := ret.Get(0).(func() *info.Client); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(info.Client)
+			r0 = ret.Get(0).(*info.Client)
 		}
 	}
 
@@ -147,19 +145,19 @@ func (_m *Client) InfoAPI() info.Client {
 }
 
 // PChainAPI provides a mock function with no fields
-func (_m *Client) PChainAPI() platformvm.Client {
+func (_m *Client) PChainAPI() *platformvm.Client {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for PChainAPI")
 	}
 
-	var r0 platformvm.Client
-	if rf, ok := ret.Get(0).(func() platformvm.Client); ok {
+	var r0 *platformvm.Client
+	if rf, ok := ret.Get(0).(func() *platformvm.Client); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(platformvm.Client)
+			r0 = ret.Get(0).(*platformvm.Client)
 		}
 	}
 
@@ -167,19 +165,19 @@ func (_m *Client) PChainAPI() platformvm.Client {
 }
 
 // PChainIndexAPI provides a mock function with no fields
-func (_m *Client) PChainIndexAPI() indexer.Client {
+func (_m *Client) PChainIndexAPI() *indexer.Client {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for PChainIndexAPI")
 	}
 
-	var r0 indexer.Client
-	if rf, ok := ret.Get(0).(func() indexer.Client); ok {
+	var r0 *indexer.Client
+	if rf, ok := ret.Get(0).(func() *indexer.Client); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(indexer.Client)
+			r0 = ret.Get(0).(*indexer.Client)
 		}
 	}
 
@@ -187,19 +185,19 @@ func (_m *Client) PChainIndexAPI() indexer.Client {
 }
 
 // XChainAPI provides a mock function with no fields
-func (_m *Client) XChainAPI() avm.Client {
+func (_m *Client) XChainAPI() *avm.Client {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for XChainAPI")
 	}
 
-	var r0 avm.Client
-	if rf, ok := ret.Get(0).(func() avm.Client); ok {
+	var r0 *avm.Client
+	if rf, ok := ret.Get(0).(func() *avm.Client); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(avm.Client)
+			r0 = ret.Get(0).(*avm.Client)
 		}
 	}
 
@@ -207,19 +205,19 @@ func (_m *Client) XChainAPI() avm.Client {
 }
 
 // XChainWalletAPI provides a mock function with no fields
-func (_m *Client) XChainWalletAPI() avm.WalletClient {
+func (_m *Client) XChainWalletAPI() *avm.WalletClient {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for XChainWalletAPI")
 	}
 
-	var r0 avm.WalletClient
-	if rf, ok := ret.Get(0).(func() avm.WalletClient); ok {
+	var r0 *avm.WalletClient
+	if rf, ok := ret.Get(0).(func() *avm.WalletClient); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(avm.WalletClient)
+			r0 = ret.Get(0).(*avm.WalletClient)
 		}
 	}
 

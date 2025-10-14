@@ -8,14 +8,13 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ava-labs/avalanchego/upgrade"
-	avago_constants "github.com/ava-labs/avalanchego/utils/constants"
+	avago_upgrade "github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/subnet-evm/params"
-	"github.com/ava-labs/subnet-evm/params/extras"
-	subnetevmutils "github.com/ava-labs/subnet-evm/utils"
 )
 
 const (
@@ -27,49 +26,25 @@ const (
 	allocationCommonEthAddress      = "0xb3d82b1367d362de99ab59a658165aff520cbd4d"
 	stakingAddr                     = "X-custom1g65uqn6t77p656w64023nh8nd9updzmxwd59gh"
 	walletAddr                      = "X-custom18jma8ppw3nhx5r4ap8clazz0dps7rv5u9xde7p"
+	defaultGasLimit                 = uint64(100_000_000) // Gas limit is arbitrary
 )
 
+var defaultFundedKeyCChainAmount = new(big.Int).Exp(big.NewInt(10), big.NewInt(30), nil)
+
 func generateCchainGenesis() ([]byte, error) {
-	chainConfig := &params.ChainConfig{
-		ChainID:             big.NewInt(43112),
-		HomesteadBlock:      big.NewInt(0),
-		DAOForkBlock:        big.NewInt(0),
-		DAOForkSupport:      true,
-		EIP150Block:         big.NewInt(0),
-		EIP155Block:         big.NewInt(0),
-		EIP158Block:         big.NewInt(0),
-		ByzantiumBlock:      big.NewInt(0),
-		ConstantinopleBlock: big.NewInt(0),
-		PetersburgBlock:     big.NewInt(0),
-		IstanbulBlock:       big.NewInt(0),
-		MuirGlacierBlock:    big.NewInt(0),
+	cChainBalances := make(core.GenesisAlloc, 1)
+	cChainBalances[common.HexToAddress(defaultLocalCChainFundedAddress)] = core.GenesisAccount{
+		Balance: defaultFundedKeyCChainAmount,
 	}
-	agoUpgrade := upgrade.GetConfig(avago_constants.LocalID)
-	params.GetExtra(chainConfig).NetworkUpgrades = extras.NetworkUpgrades{
-		SubnetEVMTimestamp: subnetevmutils.NewUint64(0),
-		DurangoTimestamp:   subnetevmutils.TimeToNewUint64(agoUpgrade.DurangoTime),
-		EtnaTimestamp:      subnetevmutils.TimeToNewUint64(agoUpgrade.EtnaTime),
-		FortunaTimestamp:   nil, // Fortuna is optional and has no effect on Subnet-EVM
-		GraniteTimestamp:   nil, // Granite is optional and has no effect on Subnet-EVM
+	chainID := big.NewInt(43112)
+	cChainGenesis := &core.Genesis{
+		Config:     &params.ChainConfig{ChainID: chainID},            // The rest of the config is set in coreth on VM initialization
+		Difficulty: big.NewInt(0),                                    // Difficulty is a mandatory field
+		Timestamp:  uint64(avago_upgrade.InitiallyActiveTime.Unix()), // #nosec G115 // This time enables Avalanche upgrades by default
+		GasLimit:   defaultGasLimit,
+		Alloc:      cChainBalances,
 	}
-	cChainGenesisMap := map[string]interface{}{}
-	cChainGenesisMap["config"] = chainConfig
-	cChainGenesisMap["timestamp"] = upgrade.InitiallyActiveTime.Unix()
-	cChainGenesisMap["nonce"] = hexa0Str
-	cChainGenesisMap["extraData"] = "0x00"
-	cChainGenesisMap["gasLimit"] = "0x5f5e100"
-	cChainGenesisMap["difficulty"] = hexa0Str
-	cChainGenesisMap["mixHash"] = "0x0000000000000000000000000000000000000000000000000000000000000000"
-	cChainGenesisMap["coinbase"] = "0x0000000000000000000000000000000000000000"
-	cChainGenesisMap["alloc"] = map[string]interface{}{
-		defaultLocalCChainFundedAddress: map[string]interface{}{
-			"balance": defaultLocalCChainFundedBalance,
-		},
-	}
-	cChainGenesisMap["number"] = hexa0Str
-	cChainGenesisMap["gasUsed"] = hexa0Str
-	cChainGenesisMap["parentHash"] = "0x0000000000000000000000000000000000000000000000000000000000000000"
-	return json.Marshal(cChainGenesisMap)
+	return json.Marshal(cChainGenesis)
 }
 
 func GenerateGenesis(
