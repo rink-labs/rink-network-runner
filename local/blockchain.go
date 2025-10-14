@@ -949,7 +949,7 @@ func (w *wallet) reload(uri string) {
 // it is set to max accepted duration by avalanchego
 func (ln *localNetwork) addPrimaryValidators(
 	ctx context.Context,
-	platformCli platformvm.Client,
+	platformCli *platformvm.Client,
 	w *wallet,
 ) error {
 	ln.log.Info(logging.Green.Wrap("adding the nodes as primary network validators"))
@@ -1585,7 +1585,7 @@ func createSubnets(
 // it ends at the time the primary network validation ends for the node
 func (ln *localNetwork) issueSubnetValidatorTxs(
 	ctx context.Context,
-	platformCli platformvm.Client,
+	platformCli *platformvm.Client,
 	w *wallet,
 	subnetIDs []ids.ID,
 	subnetSpecs []network.SubnetSpec,
@@ -1672,7 +1672,7 @@ func (ln *localNetwork) issueSubnetValidatorTxs(
 // waits until all nodes start validating the primary network
 func (ln *localNetwork) waitPrimaryValidators(
 	ctx context.Context,
-	platformCli platformvm.Client,
+	platformCli *platformvm.Client,
 ) error {
 	ln.log.Info(logging.Green.Wrap("waiting for the nodes to become primary validators"))
 	for {
@@ -1709,7 +1709,7 @@ func (ln *localNetwork) waitPrimaryValidators(
 // waits until all subnet participants start validating the subnetID, for all given subnets
 func (ln *localNetwork) waitSubnetValidators(
 	ctx context.Context,
-	platformCli platformvm.Client,
+	platformCli *platformvm.Client,
 	subnetIDs []ids.ID,
 	subnetSpecs []network.SubnetSpec,
 ) error {
@@ -1959,7 +1959,7 @@ func createDefaultCtx(ctx context.Context) (context.Context, context.CancelFunc)
 
 func subnetIsPermissionless(
 	ctx context.Context,
-	platformCli platformvm.Client,
+	platformCli *platformvm.Client,
 	subnetID ids.ID,
 ) (bool, error) {
 	if _, _, err := platformCli.GetCurrentSupply(ctx, subnetID); err != nil {
