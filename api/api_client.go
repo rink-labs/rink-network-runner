@@ -39,16 +39,16 @@ type NewAPIClientF func(ipAddr string, port uint16) Client
 func NewAPIClient(ipAddr string, port uint16) Client {
 	uri := fmt.Sprintf("http://%s:%d", ipAddr, port)
 	return &APIClient{
-		platform:     platformvm.NewClient(uri),
-		xChain:       avm.NewClient(uri, "X"),
-		xChainWallet: avm.NewWalletClient(uri, "X"),
+		platform:     *platformvm.NewClient(uri),
+		xChain:       *avm.NewClient(uri, "X"),
+		xChainWallet: *avm.NewWalletClient(uri, "X"),
 		cChain:       evmclient.NewCChainClient(uri),
 		cChainEth:    NewEthClient(ipAddr, uint(port)), // wrapper over ethclient.Client
-		info:         info.NewClient(uri),
-		health:       health.NewClient(uri),
-		admin:        admin.NewClient(uri),
-		pindex:       indexer.NewClient(uri + "/ext/index/P/block"),
-		cindex:       indexer.NewClient(uri + "/ext/index/C/block"),
+		info:         *info.NewClient(uri),
+		health:       *health.NewClient(uri),
+		admin:        *admin.NewClient(uri),
+		pindex:       *indexer.NewClient(uri + "/ext/index/P/block"),
+		cindex:       *indexer.NewClient(uri + "/ext/index/C/block"),
 	}
 }
 
