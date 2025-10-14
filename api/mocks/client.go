@@ -10,8 +10,6 @@ import (
 
 	client "github.com/ava-labs/coreth/plugin/evm/client"
 
-	health "github.com/ava-labs/avalanchego/api/health"
-
 	indexer "github.com/ava-labs/avalanchego/indexer"
 
 	info "github.com/ava-labs/avalanchego/api/info"
@@ -107,19 +105,19 @@ func (_m *Client) CChainIndexAPI() *indexer.Client {
 }
 
 // HealthAPI provides a mock function with no fields
-func (_m *Client) HealthAPI() *health.Client {
+func (_m *Client) HealthAPI() api.HealthClient {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for HealthAPI")
 	}
 
-	var r0 *health.Client
-	if rf, ok := ret.Get(0).(func() *health.Client); ok {
+	var r0 api.HealthClient
+	if rf, ok := ret.Get(0).(func() api.HealthClient); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*health.Client)
+			r0 = ret.Get(0).(api.HealthClient)
 		}
 	}
 
