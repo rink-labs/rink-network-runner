@@ -8,7 +8,7 @@ require (
 	github.com/ava-labs/avalanchego v1.13.6-rc.1
 	github.com/ava-labs/coreth v0.15.4-rc.4
 	github.com/ava-labs/libevm v1.13.15-0.20251002164226-35926db4d661
-	github.com/ava-labs/subnet-evm v0.7.9
+	github.com/ava-labs/subnet-evm v0.7.10-0.20251014145354-f9d536eac27d
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.1
 	github.com/onsi/ginkgo/v2 v2.22.2
 	github.com/onsi/gomega v1.36.2
