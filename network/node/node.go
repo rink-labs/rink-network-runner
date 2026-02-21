@@ -3,7 +3,6 @@ package node
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanche-network-runner/api"
@@ -24,11 +23,13 @@ type Node interface {
 	// Return a client that can be used to make API calls.
 	GetAPIClient() api.Client
 	// Return this node's IP (e.g. 127.0.0.1).
-	GetURL() string
+	GetIP() string
 	// Return this node's P2P (staking) port.
 	GetP2PPort() uint16
 	// Return this node's HTTP API port.
 	GetAPIPort() uint16
+	// Return this node's URI (e.g. http://127.0.0.1:9650).
+	GetURI() string
 	// Starts a new test peer, connects it to the given node, and returns the peer.
 	// [handler] defines how the test peer handles messages it receives.
 	// The test peer can be used to send messages to the node it's attached to.
@@ -99,14 +100,7 @@ type Config struct {
 
 // Validate returns an error if this config is invalid
 func (c *Config) Validate(expectedNetworkID uint32) error {
-	switch {
-	case c.StakingKey == "":
-		return errors.New("staking key not given")
-	case c.StakingCert == "":
-		return errors.New("staking cert not given")
-	default:
-		return validateConfigFile([]byte(c.ConfigFile), expectedNetworkID)
-	}
+	return validateConfigFile([]byte(c.ConfigFile), expectedNetworkID)
 }
 
 // Returns an error if config file [configFile] is invalid.

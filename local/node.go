@@ -6,7 +6,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"net/netip"
 	"time"
+
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 
 	"github.com/ava-labs/avalanche-network-runner/api"
 	"github.com/ava-labs/avalanche-network-runner/network/node"
@@ -17,10 +20,12 @@ import (
 	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
+	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
@@ -55,6 +60,8 @@ type localNode struct {
 	client api.Client
 	// The process running this node.
 	process NodeProcess
+	// The Public IP
+	publicIP string
 	// The API port
 	apiPort uint16
 	// The P2P (staking) port
@@ -78,11 +85,13 @@ type localNode struct {
 	// signals that the process is stopped but the information is valid
 	// and can be resumed
 	paused bool
+	// if set, returns 0.0.0.0 if httpHost setting is public
+	zeroIP bool
 }
 
 func defaultGetConnFunc(ctx context.Context, node node.Node) (net.Conn, error) {
 	dialer := net.Dialer{}
-	return dialer.DialContext(ctx, constants.NetworkType, net.JoinHostPort(node.GetURL(), fmt.Sprintf("%d", node.GetP2PPort())))
+	return dialer.DialContext(ctx, constants.NetworkType, net.JoinHostPort(node.GetIP(), fmt.Sprintf("%d", node.GetP2PPort())))
 }
 
 // AttachPeer: see Network
@@ -92,15 +101,20 @@ func (node *localNode) AttachPeer(ctx context.Context, router router.InboundHand
 		return nil, err
 	}
 	tlsConfg := peer.TLSConfig(*tlsCert, nil)
-	clientUpgrader := peer.NewTLSClientUpgrader(tlsConfg)
+	clientUpgrader := peer.NewTLSClientUpgrader(
+		tlsConfg,
+		prometheus.NewCounter(prometheus.CounterOpts{}),
+	)
 	conn, err := node.getConnFunc(ctx, node)
 	if err != nil {
 		return nil, err
 	}
+	peerID, conn, cert, err := clientUpgrader.Upgrade(conn)
+	if err != nil {
+		return nil, err
+	}
 	mc, err := message.NewCreator(
-		logging.NoLog{},
 		prometheus.NewRegistry(),
-		"",
 		constants.DefaultNetworkCompressionType,
 		10*time.Second,
 	)
@@ -109,8 +123,6 @@ func (node *localNode) AttachPeer(ctx context.Context, router router.InboundHand
 	}
 
 	metrics, err := peer.NewMetrics(
-		logging.NoLog{},
-		"",
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
@@ -125,8 +137,15 @@ func (node *localNode) AttachPeer(ctx context.Context, router router.InboundHand
 	if err != nil {
 		return nil, err
 	}
-	signerIP := ips.NewDynamicIPPort(net.IPv6zero, 0)
+	signerIP := utils.NewAtomic(netip.AddrPortFrom(
+		netip.IPv6Loopback(),
+		1,
+	))
 	tls := tlsCert.PrivateKey.(crypto.Signer)
+	bls0, err := localsigner.New()
+	if err != nil {
+		return nil, err
+	}
 	config := &peer.Config{
 		Metrics:              metrics,
 		MessageCreator:       mc,
@@ -134,31 +153,31 @@ func (node *localNode) AttachPeer(ctx context.Context, router router.InboundHand
 		InboundMsgThrottler:  throttling.NewNoInboundThrottler(),
 		Network:              peer.TestNetwork,
 		Router:               router,
-		VersionCompatibility: version.GetCompatibility(node.networkID),
+		VersionCompatibility: version.GetCompatibility(upgrade.InitiallyActiveTime),
 		MySubnets:            set.Set[ids.ID]{},
-		Beacons:              validators.NewSet(),
+		Beacons:              validators.NewManager(),
 		NetworkID:            node.networkID,
 		PingFrequency:        constants.DefaultPingFrequency,
 		PongTimeout:          constants.DefaultPingPongTimeout,
 		MaxClockDifference:   time.Minute,
 		ResourceTracker:      resourceTracker,
-		IPSigner:             peer.NewIPSigner(signerIP, tls),
-	}
-	_, conn, cert, err := clientUpgrader.Upgrade(conn)
-	if err != nil {
-		return nil, err
+		UptimeCalculator:     uptime.NoOpCalculator,
+		IPSigner:             peer.NewIPSigner(signerIP, tls, bls0),
+		SupportedACPs:        []uint32{},
+		ObjectedACPs:         []uint32{},
 	}
 
 	p := peer.Start(
 		config,
 		conn,
 		cert,
-		ids.NodeIDFromCert(tlsCert.Leaf),
+		peerID,
 		peer.NewBlockingMessageQueue(
 			config.Metrics,
 			logging.NoLog{},
 			peerMsgQueueBufferSize,
 		),
+		false,
 	)
 	cctx, cancel := context.WithTimeout(ctx, peerStartWaitTimeout)
 	err = p.AwaitReady(cctx)
@@ -196,11 +215,16 @@ func (node *localNode) GetAPIClient() api.Client {
 }
 
 // See node.Node
-func (node *localNode) GetURL() string {
-	if node.httpHost == "0.0.0.0" || node.httpHost == "." {
+func (node *localNode) GetIP() string {
+	if node.zeroIP && (node.httpHost == "0.0.0.0" || node.httpHost == ".") {
 		return "0.0.0.0"
 	}
-	return "127.0.0.1"
+	return node.publicIP
+}
+
+// See node.Node
+func (node *localNode) GetURI() string {
+	return fmt.Sprintf("http://%s:%d", node.GetIP(), node.GetAPIPort())
 }
 
 // See node.Node

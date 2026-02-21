@@ -4,13 +4,16 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"os/exec"
 	"sync"
+	"time"
 
 	"github.com/ava-labs/avalanche-network-runner/network/node"
 	"github.com/ava-labs/avalanche-network-runner/network/node/status"
 	"github.com/ava-labs/avalanche-network-runner/utils"
+	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/shirou/gopsutil/process"
 	"go.uber.org/zap"
@@ -34,7 +37,7 @@ type NodeProcess interface {
 // NodeProcessCreator is an interface for new node process creation
 type NodeProcessCreator interface {
 	GetNodeVersion(config node.Config) (string, error)
-	NewNodeProcess(config node.Config, args ...string) (NodeProcess, error)
+	NewNodeProcess(config node.Config, startupTime time.Duration, args ...string) (NodeProcess, error)
 }
 
 type nodeProcessCreator struct {
@@ -53,7 +56,11 @@ type nodeProcessCreator struct {
 // NewNodeProcess creates a new process of the passed binary
 // If the config has redirection set to `true` for either StdErr or StdOut,
 // the output will be redirected and colored
-func (npc *nodeProcessCreator) NewNodeProcess(config node.Config, args ...string) (NodeProcess, error) {
+func (npc *nodeProcessCreator) NewNodeProcess(
+	config node.Config,
+	startupTime time.Duration,
+	args ...string,
+) (NodeProcess, error) {
 	// Start the AvalancheGo node and pass it the flags defined above
 	cmd := exec.Command(config.BinaryPath, args...) //nolint
 	// assign a new color to this process (might not be used if the config isn't set for it)
@@ -75,7 +82,7 @@ func (npc *nodeProcessCreator) NewNodeProcess(config node.Config, args ...string
 		// redirect stderr and assign a color to the text
 		utils.ColorAndPrepend(stderr, npc.stderr, config.Name, color)
 	}
-	return newNodeProcess(config.Name, npc.log, cmd)
+	return newNodeProcess(config.Name, npc.log, cmd, startupTime)
 }
 
 type nodeProcess struct {
@@ -89,30 +96,46 @@ type nodeProcess struct {
 	closedOnStop chan struct{}
 }
 
-func newNodeProcess(name string, log logging.Logger, cmd *exec.Cmd) (*nodeProcess, error) {
+func newNodeProcess(
+	name string,
+	log logging.Logger,
+	cmd *exec.Cmd,
+	startupTime time.Duration,
+) (*nodeProcess, error) {
 	np := &nodeProcess{
 		name:         name,
 		log:          log,
 		cmd:          cmd,
 		closedOnStop: make(chan struct{}),
 	}
-	return np, np.start()
+	return np, np.start(startupTime)
 }
 
 // Start this process.
 // Must only be called once.
-func (p *nodeProcess) start() error {
+func (p *nodeProcess) start(
+	startupTime time.Duration,
+) error {
 	p.lock.Lock()
-	defer p.lock.Unlock()
 
 	p.state = status.Running
 	if err := p.cmd.Start(); err != nil {
 		p.state = status.Stopped
 		close(p.closedOnStop)
+		p.lock.Unlock()
 		return fmt.Errorf("couldn't start process: %w", err)
 	}
 
 	go p.awaitExit()
+	p.lock.Unlock()
+	time.Sleep(startupTime)
+
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	if p.state != status.Running {
+		return fmt.Errorf("process failed before startup time of %.0f seconds", startupTime.Seconds())
+	}
+
 	return nil
 }
 
@@ -166,7 +189,12 @@ func (p *nodeProcess) Stop(ctx context.Context) int {
 	select {
 	case <-ctx.Done():
 		p.log.Warn("context cancelled while waiting for node to stop", zap.String("node", p.name))
-		killDescendants(int32(proc.Pid), p.log)
+		pid := proc.Pid
+		if pid > math.MaxInt32 || pid < math.MinInt32 { // int32 range
+			p.log.Warn("process ID out of int32 range, skipping killDescendants", zap.Int("pid", pid))
+		} else {
+			killDescendants(int32(pid), p.log)
+		}
 		if err := proc.Signal(os.Kill); err != nil {
 			p.log.Warn("sending SIGKILL errored", zap.Error(err))
 		}
@@ -210,9 +238,9 @@ func killDescendants(pid int32, log logging.Logger) {
 }
 
 // GetNodeVersion gets the version of the executable as per --version flag
-func (*nodeProcessCreator) GetNodeVersion(config node.Config) (string, error) {
+func (*nodeProcessCreator) GetNodeVersion(c node.Config) (string, error) {
 	// Start the AvalancheGo node and pass it the --version flag
-	out, err := exec.Command(config.BinaryPath, "--version").Output() //nolint
+	out, err := exec.Command(c.BinaryPath, "--"+config.VersionKey).Output() //nolint
 	if err != nil {
 		return "", err
 	}
